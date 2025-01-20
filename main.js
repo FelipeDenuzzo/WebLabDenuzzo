@@ -1,219 +1,231 @@
-let player;
-let cursors;
-let lightMask;
-let walls;
-let goal;
-let timerText;
-let startTime;
-let mazeVisible = false; // Variável para controlar a visibilidade do labirinto
+class MainScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'MainScene' });
+  }
 
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#ffffff', // Fundo branco
-    physics: {
-        default: 'arcade',
-        arcade: {
-            debug: false,
-        },
-    },
-    scene: {
-        preload: preload,
-        create: create,
-        update: update,
-    },
-};
+  preload() {
+    this.load.image('player', 'assets/player.png');
+    this.load.image('goal', 'assets/goal.png');
+    this.load.image('buttonUp', 'assets/buttontop.png');
+    this.load.image('buttonDown', 'assets/buttondown.png');
+    this.load.image('buttonLeft', 'assets/buttonleft.png');
+    this.load.image('buttonRight', 'assets/buttonright.png');
+  }
 
-const game = new Phaser.Game(config);
-
-function preload() {
-    // Carregar a imagem do jogador e do objetivo
-    this.load.image('player', 'assets/player.png'); // Imagem do jogador
-    this.load.image('goal', 'assets/goal.png'); // Imagem do ponto de chegada
-}
-
-function create() {
+  create() {
     // Criar grupo de paredes
-    walls = this.physics.add.staticGroup();
+    this.walls = this.physics.add.staticGroup();
 
     // Gerar o labirinto
-    generateMaze(this, walls);
+    this.generateMaze(this.walls);
 
-    // Criar o jogador como um sprite
-    player = this.physics.add.sprite(40, 40, 'player');
-    player.setScale(0.5); // Ajusta o tamanho do jogador
-    player.setCollideWorldBounds(true); // Impede o jogador de sair da tela
+    // Criar o jogador
+    this.player = this.physics.add.sprite(40, 40, 'player');
+    this.player.setScale(0.5).setCollideWorldBounds(true);
 
-    // Verificar se o jogador começa preso
-    checkPlayerStartPosition(player, walls);
-
-    // Configurar os controles com as setas do teclado
-    cursors = this.input.keyboard.createCursorKeys();
+    // Verificar a posição inicial do jogador
+    this.checkPlayerStartPosition();
 
     // Adicionar colisão entre o jogador e as paredes
-    this.physics.add.collider(player, walls);
+    this.physics.add.collider(this.player, this.walls);
+
+    // Criar o objetivo
+    const goalPosition = this.getGoalPosition(this.walls);
+    this.goal = this.physics.add.staticSprite(goalPosition.x, goalPosition.y, 'goal').setScale(0.5);
+
+    // Detectar a colisão com o objetivo
+    this.physics.add.overlap(this.player, this.goal, this.reachGoal, null, this);
 
     // Criar o temporizador
-    startTime = this.time.now;
-    timerText = this.add.text(10, 10, 'Tempo: 0', {
-        font: '20px Arial',
-        fill: '#000000', // Cor preta para o timer
-    });
+    this.startTime = this.time.now;
+    this.timerText = this.add.text(10, 10, 'Tempo: 0s', { font: '20px Arial', fill: '#000' });
 
-    // Criar o círculo de luz ao redor do jogador
-    lightMask = this.make.graphics();
+    // Criar o círculo de luz
+    this.lightMask = this.make.graphics();
 
-    // Criar o objetivo com a imagem (ajustado para ser acessível)
-    const goalPosition = getGoalPosition(walls); // Função para garantir a posição livre
-    goal = this.add.sprite(goalPosition.x, goalPosition.y, 'goal'); // Usando imagem para o ponto de chegada
-    goal.setScale(0.5); // Ajustar a escala da imagem do objetivo
+    // Configurar controles do teclado
+    this.cursors = this.input.keyboard.createCursorKeys();
 
-    this.physics.add.existing(goal, true); // Tornar o objetivo imutável
+    // Garantir que a câmera cobre apenas o labirinto
+    this.cameras.main.setBounds(0, 0, 800, 600);
+  }
 
-    // Detectar a colisão do jogador com o objetivo
-    this.physics.add.overlap(player, goal, () => {
-        const endTime = Math.floor((this.time.now - startTime) / 1000);
-        alert(`Parabéns! Você chegou ao fim em ${endTime} segundos.`);
-        
-        // Exibir o labirinto completo
-        mazeVisible = true;
+  update() {
+    // Atualizar a movimentação do jogador
+    this.updatePlayerMovement();
 
-        // Remover a máscara de luz
-        scene.cameras.main.setMask(null); // Exibir o labirinto completo sem a máscara de luz
-    });
+    // Atualizar o temporizador
+    const elapsedTime = Math.floor((this.time.now - this.startTime) / 1000);
+    this.timerText.setText(`Tempo: ${elapsedTime}s`);
 
-    // Definir limites da câmera
-    this.cameras.main.setBounds(0, 0, config.width, config.height);
-}
+    // Atualizar a máscara de luz
+    this.updateLighting();
+  }
 
-function update() {
-    // Resetar a velocidade do jogador
-    player.setVelocity(0);
-
-    // Movimentação do jogador com as teclas de seta
-    if (cursors.left.isDown) {
-        player.setVelocityX(-200);
-        player.setRotation(Math.PI); // Rotaciona o jogador para a esquerda
-    }
-    if (cursors.right.isDown) {
-        player.setVelocityX(200);
-        player.setRotation(0); // Rotaciona o jogador para a direita
-    }
-    if (cursors.up.isDown) {
-        player.setVelocityY(-200);
-        player.setRotation(-Math.PI / 2); // Rotaciona o jogador para cima
-    }
-    if (cursors.down.isDown) {
-        player.setVelocityY(200);
-        player.setRotation(Math.PI / 2); // Rotaciona o jogador para baixo
-    }
-
-    // Atualizar o tempo decorrido no temporizador
-    const elapsedTime = Math.floor((this.time.now - startTime) / 1000);
-    timerText.setText(`Tempo: ${elapsedTime}s`);
-
-    // Atualizar a luz ao redor do jogador
-    updateLighting(this);
-}
-
-function generateMaze(scene, wallsGroup) {
+  generateMaze(wallsGroup) {
     const mazeWidth = 16;
     const mazeHeight = 12;
     const cellSize = 50;
 
-    // Gerar o labirinto com paredes
     for (let y = 0; y < mazeHeight; y++) {
-        for (let x = 0; x < mazeWidth; x++) {
-            if (
-                Math.random() < 0.3 || // Probabilidade de criar uma parede
-                x === 0 || // Paredes nas bordas
-                y === 0 ||
-                x === mazeWidth - 1 ||
-                y === mazeHeight - 1
-            ) {
-                // Criar uma parede como retângulo
-                const wall = scene.add.rectangle(
-                    x * cellSize,
-                    y * cellSize,
-                    cellSize,
-                    cellSize,
-                    0x444444 // Cor cinza escuro para as paredes
-                );
-                scene.physics.add.existing(wall, true); // Tornar a parede física
-                wallsGroup.add(wall);
-            }
+      for (let x = 0; x < mazeWidth; x++) {
+        if (
+          Math.random() < 0.3 || // Probabilidade de criar uma parede
+          x === 0 || y === 0 || x === mazeWidth - 1 || y === mazeHeight - 1
+        ) {
+          const wall = this.add.rectangle(
+            x * cellSize,
+            y * cellSize,
+            cellSize,
+            cellSize,
+            0x444444
+          );
+          this.physics.add.existing(wall, true);
+          wallsGroup.add(wall);
         }
+      }
     }
-}
+  }
 
-function checkPlayerStartPosition(player, walls) {
-    // Verificar se o jogador está preso ao inicializar
-    const playerBounds = player.getBounds();
-
-    walls.children.iterate(wall => {
-        const wallBounds = wall.getBounds();
-
-        // Se o jogador está colidindo com uma parede na posição inicial, reposicionar
-        if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, wallBounds)) {
-            player.setPosition(40, 40); // Reposicionar o jogador
-        }
+  checkPlayerStartPosition() {
+    const playerBounds = this.player.getBounds();
+    this.walls.children.iterate(wall => {
+      const wallBounds = wall.getBounds();
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, wallBounds)) {
+        this.player.setPosition(40, 40);
+      }
     });
-}
+  }
 
-function getGoalPosition(walls) {
-    // Função para garantir uma posição livre para o objetivo
+  getGoalPosition(wallsGroup) {
     const mazeWidth = 16;
     const mazeHeight = 12;
     const cellSize = 50;
 
-    let positionFound = false;
     let goalX, goalY;
+    let positionFound = false;
 
     while (!positionFound) {
-        // Tentar uma posição aleatória
-        goalX = Math.floor(Math.random() * (mazeWidth - 1)) * cellSize + cellSize / 2;
-        goalY = Math.floor(Math.random() * (mazeHeight - 1)) * cellSize + cellSize / 2;
+      goalX = Math.floor(Math.random() * (mazeWidth - 1)) * cellSize + cellSize / 2;
+      goalY = Math.floor(Math.random() * (mazeHeight - 1)) * cellSize + cellSize / 2;
 
-        // Verificar se a posição não colide com paredes
-        positionFound = true;
-
-        walls.children.iterate(wall => {
-            const wallBounds = wall.getBounds();
-            const goalBounds = new Phaser.Geom.Rectangle(goalX - 25, goalY - 25, 50, 50); // Considerar o tamanho do objetivo
-
-            if (Phaser.Geom.Intersects.RectangleToRectangle(goalBounds, wallBounds)) {
-                positionFound = false; // Se colidir, tentar novamente
-            }
-        });
+      positionFound = true;
+      wallsGroup.children.iterate(wall => {
+        const wallBounds = wall.getBounds();
+        const goalBounds = new Phaser.Geom.Rectangle(goalX - 25, goalY - 25, 50, 50);
+        if (Phaser.Geom.Intersects.RectangleToRectangle(goalBounds, wallBounds)) {
+          positionFound = false;
+        }
+      });
     }
 
     return { x: goalX, y: goalY };
-}
+  }
 
-function updateLighting(scene) {
-    if (mazeVisible) {
-        return; // Não aplicar a máscara de luz se o labirinto for completamente iluminado
+  reachGoal() {
+    const endTime = Math.floor((this.time.now - this.startTime) / 1000);
+    alert(`Parabéns! Você chegou ao fim em ${endTime} segundos.`);
+  }
+
+  updatePlayerMovement() {
+    const speed = 200;
+    this.player.setVelocity(0);
+  
+    // Movimentação pelo teclado
+    if (this.cursors.left.isDown || buttonStates.left) {
+      this.player.setVelocityX(-speed).setRotation(Math.PI);
+    } else if (this.cursors.right.isDown || buttonStates.right) {
+      this.player.setVelocityX(speed).setRotation(0);
     }
+  
+    if (this.cursors.up.isDown || buttonStates.up) {
+      this.player.setVelocityY(-speed).setRotation(-Math.PI / 2);
+    } else if (this.cursors.down.isDown || buttonStates.down) {
+      this.player.setVelocityY(speed).setRotation(Math.PI / 2);
+    }
+  }
+  
 
-    // Limpar a luz anterior
-    lightMask.clear();
+  updateLighting() {
+    this.lightMask.clear();
+    this.lightMask.fillStyle(0xffffff, 1);
+    this.lightMask.beginPath();
+    this.lightMask.arc(this.player.x, this.player.y, 100, 0, Math.PI * 2);
+    this.lightMask.fillPath();
 
-    // Desenhar uma máscara de luz circular ao redor do jogador
-    const lightRadius = 100; // Ajustado para um círculo menor
-    lightMask.fillStyle(0xffffff, 1);
-    lightMask.fillCircle(player.x, player.y, lightRadius);
-
-    // Criar uma máscara para a cena
-    const mask = new Phaser.Display.Masks.GeometryMask(scene, lightMask);
-    scene.cameras.main.setMask(mask);
-
-    // Atualizar a visibilidade das paredes com base na área de luz
-    walls.children.iterate(wall => {
-        const wallBounds = wall.getBounds();
-        const dx = wallBounds.centerX - player.x;
-        const dy = wallBounds.centerY - player.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        wall.visible = distance <= lightRadius;
-    });
+    const mask = new Phaser.Display.Masks.GeometryMask(this, this.lightMask);
+    this.cameras.main.setMask(mask);
+  }
 }
+
+class UIScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'UIScene', active: true });
+  }
+
+  preload() {
+    this.load.image('buttonUp', 'assets/buttontop.png');
+    this.load.image('buttonDown', 'assets/buttondown.png');
+    this.load.image('buttonLeft', 'assets/buttonleft.png');
+    this.load.image('buttonRight', 'assets/buttonright.png');
+  }
+
+  create() {
+    const buttonSize = 60;
+    const screenWidth = this.sys.game.config.width;
+    const screenHeight = this.sys.game.config.height;
+
+    this.controlButtons = {
+      up: this.add
+        .image(screenWidth / 2, 620, 'buttonUp')
+        .setInteractive()
+        .setDisplaySize(buttonSize, buttonSize),
+      down: this.add
+        .image(screenWidth / 2, 680, 'buttonDown')
+        .setInteractive()
+        .setDisplaySize(buttonSize, buttonSize),
+      left: this.add
+        .image(screenWidth / 2 - buttonSize, 650, 'buttonLeft')
+        .setInteractive()
+        .setDisplaySize(buttonSize, buttonSize),
+      right: this.add
+        .image(screenWidth / 2 + buttonSize, 650, 'buttonRight')
+        .setInteractive()
+        .setDisplaySize(buttonSize, buttonSize),
+    };
+
+    Object.values(this.controlButtons).forEach(button => {
+      button.setScrollFactor(0);
+    });
+
+    this.controlButtons.up.on('pointerdown', () => (buttonStates.up = true));
+    this.controlButtons.up.on('pointerup', () => (buttonStates.up = false));
+
+    this.controlButtons.down.on('pointerdown', () => (buttonStates.down = true));
+    this.controlButtons.down.on('pointerup', () => (buttonStates.down = false));
+
+    this.controlButtons.left.on('pointerdown', () => (buttonStates.left = true));
+    this.controlButtons.left.on('pointerup', () => (buttonStates.left = false));
+
+    this.controlButtons.right.on('pointerdown', () => (buttonStates.right = true));
+    this.controlButtons.right.on('pointerup', () => (buttonStates.right = false));
+  }
+}
+
+const buttonStates = { up: false, down: false, left: false, right: false };
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 700,
+  backgroundColor: '#ffffff',
+  physics: {
+    default: 'arcade',
+    arcade: {
+      debug: false,
+    },
+  },
+  scene: [MainScene, UIScene],
+};
+
+const game = new Phaser.Game(config);
