@@ -23,7 +23,7 @@ class MainScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(40, 40, 'player');
     this.player.setScale(0.5).setCollideWorldBounds(true);
 
-    // Verificar a posição inicial do jogador
+    // Garantir posição inicial válida para o jogador
     this.checkPlayerStartPosition();
 
     // Adicionar colisão entre o jogador e as paredes
@@ -65,36 +65,62 @@ class MainScene extends Phaser.Scene {
   generateMaze(wallsGroup) {
     const mazeWidth = 16;
     const mazeHeight = 12;
-    const cellSize = 50;
+    const cellSize = 50; // Tamanho da célula do labirinto
+    const wallThickness = 10; // Espessura das paredes
 
     for (let y = 0; y < mazeHeight; y++) {
-      for (let x = 0; x < mazeWidth; x++) {
-        if (
-          Math.random() < 0.3 || // Probabilidade de criar uma parede
-          x === 0 || y === 0 || x === mazeWidth - 1 || y === mazeHeight - 1
-        ) {
-          const wall = this.add.rectangle(
-            x * cellSize,
-            y * cellSize,
-            cellSize,
-            cellSize,
-            0x444444
-          );
-          this.physics.add.existing(wall, true);
-          wallsGroup.add(wall);
+        for (let x = 0; x < mazeWidth; x++) {
+            if (
+                Math.random() < 0.3 || // Probabilidade de criar uma parede
+                x === 0 || y === 0 || x === mazeWidth - 1 || y === mazeHeight - 1
+            ) {
+                const wall = this.add.rectangle(
+                    x * cellSize + cellSize / 2, // Centraliza a parede
+                    y * cellSize + cellSize / 2,
+                    cellSize, // Largura padrão da célula
+                    wallThickness, // Altura ajustada para parede fina
+                    0x444444
+                );
+                this.physics.add.existing(wall, true);
+                wallsGroup.add(wall);
+            }
         }
-      }
     }
-  }
+}
+
 
   checkPlayerStartPosition() {
-    const playerBounds = this.player.getBounds();
-    this.walls.children.iterate(wall => {
-      const wallBounds = wall.getBounds();
-      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, wallBounds)) {
-        this.player.setPosition(40, 40);
-      }
-    });
+    const mazeWidth = 16; // Largura do labirinto em células
+    const mazeHeight = 12; // Altura do labirinto em células
+    const cellSize = 50; // Tamanho de cada célula do labirinto
+
+    let isBlocked = true;
+    let attempts = 0; // Contador para evitar loops infinitos
+
+    while (isBlocked && attempts < 100) { // Limite de tentativas
+      isBlocked = false;
+
+      // Gerar uma nova posição aleatória dentro dos limites do labirinto
+      const newX = Math.floor(Math.random() * (mazeWidth - 2) + 1) * cellSize + cellSize / 2;
+      const newY = Math.floor(Math.random() * (mazeHeight - 2) + 1) * cellSize + cellSize / 2;
+
+      this.player.setPosition(newX, newY);
+
+      // Verificar se o jogador está colidindo com uma parede
+      this.walls.children.iterate(wall => {
+        const wallBounds = wall.getBounds();
+        const playerBounds = this.player.getBounds();
+        if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, wallBounds)) {
+          isBlocked = true;
+        }
+      });
+
+      attempts++;
+    }
+
+    if (attempts >= 100) {
+      console.error("Não foi possível encontrar uma posição inicial válida para o jogador.");
+    }
   }
 
   getGoalPosition(wallsGroup) {
@@ -125,13 +151,16 @@ class MainScene extends Phaser.Scene {
   reachGoal() {
     const endTime = Math.floor((this.time.now - this.startTime) / 1000);
     alert(`Parabéns! Você chegou ao fim em ${endTime} segundos.`);
+  
+    // Reiniciar a cena principal após o alerta
+    this.scene.restart();
   }
+  
 
   updatePlayerMovement() {
     const speed = 200;
     this.player.setVelocity(0);
   
-    // Movimentação pelo teclado
     if (this.cursors.left.isDown || buttonStates.left) {
       this.player.setVelocityX(-speed).setRotation(Math.PI);
     } else if (this.cursors.right.isDown || buttonStates.right) {
