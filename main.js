@@ -1,5 +1,3 @@
-// Phaser 3: Labirinto com paredes contínuas e timer visível.
-
 class MainScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MainScene' });
@@ -15,13 +13,17 @@ class MainScene extends Phaser.Scene {
     this.mazeWidth = Math.floor(this.scale.width / this.cellSize);
     this.mazeHeight = Math.floor(this.scale.height / this.cellSize);
 
-    // Criar grupo de paredes (usando gráficos para paredes contínuas)
-    this.wallGraphics = this.add.graphics();
-    this.wallGraphics.lineStyle(2, 0x444444, 1); // Linhas contínuas e finas
-    this.generateMaze();
+    // Geração de matriz lógica do labirinto
+    this.maze = this.generateMaze();
 
+    // Desenhar paredes contínuas
+    this.wallGraphics = this.add.graphics();
+    this.wallGraphics.lineStyle(2, 0x444444, 1);
+    this.createContinuousWalls();
+
+    // Configurar grupo de colisão para paredes
     this.walls = this.physics.add.staticGroup();
-    this.createCollidableWalls();
+    this.createCollidableWallsFromMatrix();
 
     // Jogador
     this.player = this.physics.add.sprite(this.cellSize / 2, this.cellSize / 2, 'player');
@@ -38,7 +40,6 @@ class MainScene extends Phaser.Scene {
     // Temporizador
     this.startTime = this.time.now;
     this.timerText = this.add.text(10, 10, 'Tempo: 0s', { font: '20px Arial', fill: '#000' });
-    this.timerText.setDepth(1); // Tornar visível acima da máscara
 
     // Máscara de luz
     this.lightMask = this.make.graphics();
@@ -67,7 +68,6 @@ class MainScene extends Phaser.Scene {
   }
 
   generateMaze() {
-    // Geração do labirinto usando linhas contínuas
     const maze = Array.from({ length: this.mazeHeight }, () => Array(this.mazeWidth).fill(1));
 
     const carvePassages = (x, y) => {
@@ -93,29 +93,41 @@ class MainScene extends Phaser.Scene {
     maze[1][1] = 0; // Início do labirinto
     carvePassages(1, 1);
 
+    return maze;
+  }
+
+  createContinuousWalls() {
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
-        if (maze[y][x] === 1) {
-          this.wallGraphics.strokeRect(
-            x * this.cellSize,
-            y * this.cellSize,
-            this.cellSize,
-            this.cellSize
-          );
+        if (this.maze[y][x] === 1) {
+          const x1 = x * this.cellSize;
+          const y1 = y * this.cellSize;
+          const x2 = (x + 1) * this.cellSize;
+          const y2 = (y + 1) * this.cellSize;
+
+          this.wallGraphics.strokeLineShape(new Phaser.Geom.Line(x1, y1, x2, y1)); // Superior
+          this.wallGraphics.strokeLineShape(new Phaser.Geom.Line(x1, y1, x1, y2)); // Esquerda
         }
       }
     }
   }
 
-  createCollidableWalls() {
-    // Criar paredes colidíveis com base nos gráficos do labirinto
-    const maze = this.wallGraphics.geometryMask.geometry.data;
-
-    maze.forEach(segment => {
-      const wall = this.add.rectangle(segment.x, segment.y, segment.width, segment.height, 0x444444);
-      this.physics.add.existing(wall, true);
-      this.walls.add(wall);
-    });
+  createCollidableWallsFromMatrix() {
+    for (let y = 0; y < this.mazeHeight; y++) {
+      for (let x = 0; x < this.mazeWidth; x++) {
+        if (this.maze[y][x] === 1) {
+          const wall = this.add.rectangle(
+            x * this.cellSize + this.cellSize / 2,
+            y * this.cellSize + this.cellSize / 2,
+            this.cellSize,
+            this.cellSize,
+            0x444444
+          );
+          this.physics.add.existing(wall, true);
+          this.walls.add(wall);
+        }
+      }
+    }
   }
 
   checkPlayerStartPosition() {
