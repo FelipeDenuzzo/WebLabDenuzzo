@@ -1,4 +1,4 @@
-// Phaser 3: Jogo de labirinto responsivo com paredes finas, reinício automático, e suporte para dispositivos móveis
+// Phaser 3: Jogo de labirinto responsivo com paredes finas, reinício automático e suporte para dispositivos móveis.
 
 class MainScene extends Phaser.Scene {
   constructor() {
@@ -78,13 +78,17 @@ class MainScene extends Phaser.Scene {
           Math.random() < 0.3 || // Probabilidade de criar uma parede
           x === 0 || y === 0 || x === this.mazeWidth - 1 || y === this.mazeHeight - 1
         ) {
+          const wallWidth = this.cellSize * 0.5; // Dimensão horizontal reduzida
+          const wallHeight = this.cellSize * 0.2; // Dimensão vertical reduzida
+
           const wall = this.add.rectangle(
             x * this.cellSize + this.cellSize / 2,
             y * this.cellSize + this.cellSize / 2,
-            this.cellSize * 0.8,
-            this.cellSize * 0.8,
+            wallWidth, // Largura ajustada
+            wallHeight, // Altura ajustada
             0x444444
           );
+
           this.physics.add.existing(wall, true);
           wallsGroup.add(wall);
         }
