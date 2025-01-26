@@ -1,5 +1,3 @@
-// Phaser 3: Jogo de labirinto responsivo com paredes finas, reinício automático e suporte para dispositivos móveis.
-
 class MainScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MainScene' });
@@ -8,10 +6,6 @@ class MainScene extends Phaser.Scene {
   preload() {
     this.load.image('player', 'assets/player.png');
     this.load.image('goal', 'assets/goal.png');
-    this.load.image('buttonUp', 'assets/buttontop.png');
-    this.load.image('buttonDown', 'assets/buttondown.png');
-    this.load.image('buttonLeft', 'assets/buttonleft.png');
-    this.load.image('buttonRight', 'assets/buttonright.png');
   }
 
   create() {
@@ -20,32 +14,24 @@ class MainScene extends Phaser.Scene {
     this.mazeWidth = Math.floor(this.scale.width / this.cellSize);
     this.mazeHeight = Math.floor(this.scale.height / this.cellSize);
 
-    // Criar grupo de paredes
-    this.walls = this.physics.add.staticGroup();
+    // Criar grupo de paredes (agora com gráficos)
+    this.wallGraphics = this.add.graphics();
 
-    // Gerar o labirinto
-    this.generateMaze(this.walls);
+    // Gerar o labirinto contínuo
+    this.generateContinuousMaze();
 
     // Criar o jogador
     this.player = this.physics.add.sprite(this.cellSize / 2, this.cellSize / 2, 'player');
     this.player.setScale(0.5).setCollideWorldBounds(true);
-    this.checkPlayerStartPosition();
-
-    // Adicionar colisão entre o jogador e as paredes
-    this.physics.add.collider(this.player, this.walls);
 
     // Criar o objetivo
-    const goalPosition = this.getGoalPosition(this.walls);
+    const goalPosition = this.getGoalPosition();
     this.goal = this.physics.add.staticSprite(goalPosition.x, goalPosition.y, 'goal').setScale(0.5);
 
     // Detectar a colisão com o objetivo
     this.physics.add.overlap(this.player, this.goal, this.reachGoal, null, this);
 
-    // Criar o temporizador
-    this.startTime = this.time.now;
-    this.timerText = this.add.text(10, 10, 'Tempo: 0s', { font: '20px Arial', fill: '#000' }).setScrollFactor(0);
-
-    // Criar máscara de luz
+    // Criar máscara de luz com raio reduzido
     this.lightMask = this.make.graphics();
 
     // Configurar controles do teclado
@@ -54,6 +40,10 @@ class MainScene extends Phaser.Scene {
     // Ajustar câmera ao labirinto
     this.cameras.main.setBounds(0, 0, this.mazeWidth * this.cellSize, this.mazeHeight * this.cellSize);
     this.cameras.main.startFollow(this.player);
+
+    // Criar temporizador
+    this.startTime = this.time.now;
+    this.timerText = this.add.text(10, 10, 'Tempo: 0s', { font: '20px Arial', fill: '#000' }).setScrollFactor(0);
 
     // Evento de redimensionamento
     this.scale.on('resize', this.resizeGame, this);
@@ -71,58 +61,71 @@ class MainScene extends Phaser.Scene {
     this.updateLighting();
   }
 
-  generateMaze(wallsGroup) {
+  generateContinuousMaze() {
+    const maze = this.createMazeGrid();
+
+    // Configurar o estilo das paredes
+    this.wallGraphics.lineStyle(2, 0x444444, 1); // Linhas finas e contínuas
+
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
-        if (
-          Math.random() < 0.3 || // Probabilidade de criar uma parede
-          x === 0 || y === 0 || x === this.mazeWidth - 1 || y === this.mazeHeight - 1
-        ) {
-          const wallWidth = this.cellSize * 0.5; // Dimensão horizontal reduzida
-          const wallHeight = this.cellSize * 0.2; // Dimensão vertical reduzida
-
-          const wall = this.add.rectangle(
-            x * this.cellSize + this.cellSize / 2,
-            y * this.cellSize + this.cellSize / 2,
-            wallWidth, // Largura ajustada
-            wallHeight, // Altura ajustada
-            0x444444
-          );
-
-          this.physics.add.existing(wall, true);
-          wallsGroup.add(wall);
+        if (maze[y][x] === 1) {
+          // Desenhar as paredes como linhas contínuas
+          this.drawWall(x, y);
         }
       }
     }
   }
 
-  checkPlayerStartPosition() {
-    const playerBounds = this.player.getBounds();
-    this.walls.children.iterate(wall => {
-      const wallBounds = wall.getBounds();
-      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, wallBounds)) {
-        this.player.setPosition(this.cellSize / 2, this.cellSize / 2);
-      }
-    });
+  drawWall(x, y) {
+    const x1 = x * this.cellSize;
+    const y1 = y * this.cellSize;
+    const x2 = x1 + this.cellSize;
+    const y2 = y1 + this.cellSize;
+
+    // Desenhar a parede como um retângulo de linhas
+    this.wallGraphics.strokeRect(x1, y1, this.cellSize, this.cellSize);
   }
 
-  getGoalPosition(wallsGroup) {
-    let goalX, goalY;
-    let positionFound = false;
+  createMazeGrid() {
+    // Algoritmo de criação de labirinto (ex.: divisão recursiva)
+    const maze = Array.from({ length: this.mazeHeight }, () => Array(this.mazeWidth).fill(1));
 
-    while (!positionFound) {
+    const carvePassages = (x, y) => {
+      const directions = Phaser.Utils.Array.Shuffle([
+        { dx: 1, dy: 0 },
+        { dx: -1, dy: 0 },
+        { dx: 0, dy: 1 },
+        { dx: 0, dy: -1 },
+      ]);
+
+      for (const { dx, dy } of directions) {
+        const nx = x + dx * 2;
+        const ny = y + dy * 2;
+
+        if (ny > 0 && ny < this.mazeHeight && nx > 0 && nx < this.mazeWidth && maze[ny][nx] === 1) {
+          maze[y + dy][x + dx] = 0; // Remover parede intermediária
+          maze[ny][nx] = 0; // Marcar célula como passagem
+          carvePassages(nx, ny);
+        }
+      }
+    };
+
+    // Começar a esculpir no ponto inicial
+    maze[1][1] = 0;
+    carvePassages(1, 1);
+
+    return maze;
+  }
+
+  getGoalPosition() {
+    let goalX, goalY;
+    do {
       goalX = Phaser.Math.Between(1, this.mazeWidth - 2) * this.cellSize + this.cellSize / 2;
       goalY = Phaser.Math.Between(1, this.mazeHeight - 2) * this.cellSize + this.cellSize / 2;
-
-      positionFound = true;
-      wallsGroup.children.iterate(wall => {
-        const wallBounds = wall.getBounds();
-        const goalBounds = new Phaser.Geom.Rectangle(goalX - this.cellSize / 2, goalY - this.cellSize / 2, this.cellSize, this.cellSize);
-        if (Phaser.Geom.Intersects.RectangleToRectangle(goalBounds, wallBounds)) {
-          positionFound = false;
-        }
-      });
-    }
+    } while (
+      Phaser.Math.Distance.Between(goalX, goalY, this.player.x, this.player.y) < this.cellSize * 5
+    );
 
     return { x: goalX, y: goalY };
   }
@@ -137,15 +140,15 @@ class MainScene extends Phaser.Scene {
     const speed = 200;
     this.player.setVelocity(0);
 
-    if (this.cursors.left.isDown || buttonStates.left) {
+    if (this.cursors.left.isDown) {
       this.player.setVelocityX(-speed).setRotation(Math.PI);
-    } else if (this.cursors.right.isDown || buttonStates.right) {
+    } else if (this.cursors.right.isDown) {
       this.player.setVelocityX(speed).setRotation(0);
     }
 
-    if (this.cursors.up.isDown || buttonStates.up) {
+    if (this.cursors.up.isDown) {
       this.player.setVelocityY(-speed).setRotation(-Math.PI / 2);
-    } else if (this.cursors.down.isDown || buttonStates.down) {
+    } else if (this.cursors.down.isDown) {
       this.player.setVelocityY(speed).setRotation(Math.PI / 2);
     }
   }
@@ -154,7 +157,7 @@ class MainScene extends Phaser.Scene {
     this.lightMask.clear();
     this.lightMask.fillStyle(0xffffff, 1);
     this.lightMask.beginPath();
-    this.lightMask.arc(this.player.x, this.player.y, this.cellSize * 2, 0, Math.PI * 2);
+    this.lightMask.arc(this.player.x, this.player.y, this.cellSize * 1.5, 0, Math.PI * 2); // Reduzir raio da luz
     this.lightMask.fillPath();
 
     const mask = new Phaser.Display.Masks.GeometryMask(this, this.lightMask);
@@ -171,62 +174,6 @@ class MainScene extends Phaser.Scene {
   }
 }
 
-class UIScene extends Phaser.Scene {
-  constructor() {
-    super({ key: 'UIScene', active: true });
-  }
-
-  preload() {
-    this.load.image('buttonUp', 'assets/buttontop.png');
-    this.load.image('buttonDown', 'assets/buttondown.png');
-    this.load.image('buttonLeft', 'assets/buttonleft.png');
-    this.load.image('buttonRight', 'assets/buttonright.png');
-  }
-
-  create() {
-    const buttonSize = Math.min(this.scale.width, this.scale.height) / 10;
-    const screenWidth = this.scale.width;
-    const screenHeight = this.scale.height;
-
-    this.controlButtons = {
-      up: this.add
-        .image(screenWidth / 2, screenHeight - buttonSize * 2.5, 'buttonUp')
-        .setInteractive()
-        .setDisplaySize(buttonSize, buttonSize),
-      down: this.add
-        .image(screenWidth / 2, screenHeight - buttonSize / 2, 'buttonDown')
-        .setInteractive()
-        .setDisplaySize(buttonSize, buttonSize),
-      left: this.add
-        .image(screenWidth / 2 - buttonSize, screenHeight - buttonSize * 1.5, 'buttonLeft')
-        .setInteractive()
-        .setDisplaySize(buttonSize, buttonSize),
-      right: this.add
-        .image(screenWidth / 2 + buttonSize, screenHeight - buttonSize * 1.5, 'buttonRight')
-        .setInteractive()
-        .setDisplaySize(buttonSize, buttonSize),
-    };
-
-    Object.values(this.controlButtons).forEach(button => {
-      button.setScrollFactor(0);
-    });
-
-    this.controlButtons.up.on('pointerdown', () => (buttonStates.up = true));
-    this.controlButtons.up.on('pointerup', () => (buttonStates.up = false));
-
-    this.controlButtons.down.on('pointerdown', () => (buttonStates.down = true));
-    this.controlButtons.down.on('pointerup', () => (buttonStates.down = false));
-
-    this.controlButtons.left.on('pointerdown', () => (buttonStates.left = true));
-    this.controlButtons.left.on('pointerup', () => (buttonStates.left = false));
-
-    this.controlButtons.right.on('pointerdown', () => (buttonStates.right = true));
-    this.controlButtons.right.on('pointerup', () => (buttonStates.right = false));
-  }
-}
-
-const buttonStates = { up: false, down: false, left: false, right: false };
-
 const config = {
   type: Phaser.AUTO,
   width: window.innerWidth,
@@ -238,7 +185,7 @@ const config = {
       debug: false,
     },
   },
-  scene: [MainScene, UIScene],
+  scene: [MainScene],
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
