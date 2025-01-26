@@ -1,3 +1,5 @@
+// Phaser 3: Labirinto com paredes contínuas, controles táteis e timer visível.
+
 class MainScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MainScene' });
@@ -13,17 +15,13 @@ class MainScene extends Phaser.Scene {
     this.mazeWidth = Math.floor(this.scale.width / this.cellSize);
     this.mazeHeight = Math.floor(this.scale.height / this.cellSize);
 
-    // Geração de matriz lógica do labirinto
-    this.maze = this.generateMaze();
-
-    // Desenhar paredes contínuas
+    // Criar paredes contínuas
     this.wallGraphics = this.add.graphics();
     this.wallGraphics.lineStyle(2, 0x444444, 1);
-    this.createContinuousWalls();
+    this.generateMaze();
 
-    // Configurar grupo de colisão para paredes
     this.walls = this.physics.add.staticGroup();
-    this.createCollidableWallsFromMatrix();
+    this.createCollidableWalls();
 
     // Jogador
     this.player = this.physics.add.sprite(this.cellSize / 2, this.cellSize / 2, 'player');
@@ -40,12 +38,16 @@ class MainScene extends Phaser.Scene {
     // Temporizador
     this.startTime = this.time.now;
     this.timerText = this.add.text(10, 10, 'Tempo: 0s', { font: '20px Arial', fill: '#000' });
+    this.timerText.setDepth(1);
 
     // Máscara de luz
     this.lightMask = this.make.graphics();
 
-    // Configurar controles do teclado
+    // Controles do teclado
     this.cursors = this.input.keyboard.createCursorKeys();
+
+    // Controles táteis
+    this.setupTouchControls();
 
     // Ajustar câmera
     this.cameras.main.setBounds(0, 0, this.mazeWidth * this.cellSize, this.mazeHeight * this.cellSize);
@@ -68,7 +70,8 @@ class MainScene extends Phaser.Scene {
   }
 
   generateMaze() {
-    const maze = Array.from({ length: this.mazeHeight }, () => Array(this.mazeWidth).fill(1));
+    // Geração do labirinto com paredes contínuas
+    this.maze = Array.from({ length: this.mazeHeight }, () => Array(this.mazeWidth).fill(1));
 
     const carvePassages = (x, y) => {
       const directions = Phaser.Utils.Array.Shuffle([
@@ -82,37 +85,38 @@ class MainScene extends Phaser.Scene {
         const nx = x + dx * 2;
         const ny = y + dy * 2;
 
-        if (ny > 0 && ny < this.mazeHeight && nx > 0 && nx < this.mazeWidth && maze[ny][nx] === 1) {
-          maze[y + dy][x + dx] = 0; // Remover parede intermediária
-          maze[ny][nx] = 0; // Marcar célula como passagem
+        if (
+          ny > 0 &&
+          ny < this.mazeHeight &&
+          nx > 0 &&
+          nx < this.mazeWidth &&
+          this.maze[ny][nx] === 1
+        ) {
+          this.maze[y + dy][x + dx] = 0; // Remover parede intermediária
+          this.maze[ny][nx] = 0; // Marcar célula como passagem
           carvePassages(nx, ny);
         }
       }
     };
 
-    maze[1][1] = 0; // Início do labirinto
+    this.maze[1][1] = 0; // Início do labirinto
     carvePassages(1, 1);
 
-    return maze;
-  }
-
-  createContinuousWalls() {
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
         if (this.maze[y][x] === 1) {
-          const x1 = x * this.cellSize;
-          const y1 = y * this.cellSize;
-          const x2 = (x + 1) * this.cellSize;
-          const y2 = (y + 1) * this.cellSize;
-
-          this.wallGraphics.strokeLineShape(new Phaser.Geom.Line(x1, y1, x2, y1)); // Superior
-          this.wallGraphics.strokeLineShape(new Phaser.Geom.Line(x1, y1, x1, y2)); // Esquerda
+          this.wallGraphics.strokeRect(
+            x * this.cellSize,
+            y * this.cellSize,
+            this.cellSize,
+            this.cellSize
+          );
         }
       }
     }
   }
 
-  createCollidableWallsFromMatrix() {
+  createCollidableWalls() {
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
         if (this.maze[y][x] === 1) {
@@ -202,6 +206,30 @@ class MainScene extends Phaser.Scene {
 
     const mask = new Phaser.Display.Masks.GeometryMask(this, this.lightMask);
     this.cameras.main.setMask(mask);
+  }
+
+  setupTouchControls() {
+    this.touchControls = this.add.zone(0, 0, this.scale.width, this.scale.height);
+    this.touchControls.setInteractive();
+
+    this.touchControls.on('pointermove', pointer => {
+      const dx = pointer.x - this.player.x;
+      const dy = pointer.y - this.player.y;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) {
+          this.player.setVelocityX(200).setRotation(0);
+        } else {
+          this.player.setVelocityX(-200).setRotation(Math.PI);
+        }
+      } else {
+        if (dy > 0) {
+          this.player.setVelocityY(200).setRotation(Math.PI / 2);
+        } else {
+          this.player.setVelocityY(-200).setRotation(-Math.PI / 2);
+        }
+      }
+    });
   }
 
   resizeGame(gameSize) {
