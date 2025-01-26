@@ -65,7 +65,7 @@ class MainScene extends Phaser.Scene {
     const maze = this.createMazeGrid();
 
     // Configurar o estilo das paredes
-    this.wallGraphics.lineStyle(2, 0x444444, 1); // Linhas finas e contínuas
+    this.wallGraphics.lineStyle(0.5, 0x444444, 1); // Linhas finas e contínuas
 
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
