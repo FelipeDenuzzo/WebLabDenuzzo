@@ -1,5 +1,5 @@
 // Phaser 3: Labirinto com paredes contínuas e timer visível.
-
+ 
 class MainScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MainScene' });
