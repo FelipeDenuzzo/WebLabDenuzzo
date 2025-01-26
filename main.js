@@ -156,7 +156,7 @@ class MainScene extends Phaser.Scene {
     this.lightMask.clear();
     this.lightMask.fillStyle(0xffffff, 1);
     this.lightMask.beginPath();
-    this.lightMask.arc(this.player.x, this.player.y, this.cellSize * 1.5, 0, Math.PI * 2); // Reduzir raio da luz
+    this.lightMask.arc(this.player.x, this.player.y, this.cellSize * 1, 0, Math.PI * 2); // Reduzir raio da luz
     this.lightMask.fillPath();
 
     const mask = new Phaser.Display.Masks.GeometryMask(this, this.lightMask);
