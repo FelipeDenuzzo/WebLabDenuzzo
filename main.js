@@ -23,7 +23,7 @@ class MainScene extends Phaser.Scene {
     this.generateContinuousMaze();
 
     // Criar o jogador
-    this.player = this.physics.add.sprite(this.cellSize / 2, this.cellSize / 2, 'player');
+    this.player = this.physics.add.sprite(this.cellSize / 1.9, this.cellSize / 2, 'player');
     this.player.setScale(0.5).setCollideWorldBounds(true);
 
     // Adicionar colisão entre o jogador e as paredes
