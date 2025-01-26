@@ -1,3 +1,5 @@
+// Phaser 3: Jogo de labirinto responsivo com paredes contínuas e círculo de luz ajustado.
+
 class MainScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MainScene' });
@@ -14,8 +16,8 @@ class MainScene extends Phaser.Scene {
     this.mazeWidth = Math.floor(this.scale.width / this.cellSize);
     this.mazeHeight = Math.floor(this.scale.height / this.cellSize);
 
-    // Criar grupo de paredes (agora com gráficos)
-    this.wallGraphics = this.add.graphics();
+    // Criar grupo de paredes
+    this.walls = this.physics.add.staticGroup();
 
     // Gerar o labirinto contínuo
     this.generateContinuousMaze();
@@ -23,6 +25,9 @@ class MainScene extends Phaser.Scene {
     // Criar o jogador
     this.player = this.physics.add.sprite(this.cellSize / 2, this.cellSize / 2, 'player');
     this.player.setScale(0.5).setCollideWorldBounds(true);
+
+    // Adicionar colisão entre o jogador e as paredes
+    this.physics.add.collider(this.player, this.walls);
 
     // Criar o objetivo
     const goalPosition = this.getGoalPosition();
@@ -64,27 +69,21 @@ class MainScene extends Phaser.Scene {
   generateContinuousMaze() {
     const maze = this.createMazeGrid();
 
-    // Configurar o estilo das paredes
-    this.wallGraphics.lineStyle(2, 0x444444, 1); // Linhas finas e contínuas
-
     for (let y = 0; y < this.mazeHeight; y++) {
       for (let x = 0; x < this.mazeWidth; x++) {
         if (maze[y][x] === 1) {
-          // Desenhar as paredes como linhas contínuas
-          this.drawWall(x, y);
+          const wall = this.add.rectangle(
+            x * this.cellSize + this.cellSize / 2,
+            y * this.cellSize + this.cellSize / 2,
+            this.cellSize,
+            this.cellSize,
+            0x444444
+          );
+          this.physics.add.existing(wall, true);
+          this.walls.add(wall);
         }
       }
     }
-  }
-
-  drawWall(x, y) {
-    const x1 = x * this.cellSize;
-    const y1 = y * this.cellSize;
-    const x2 = x1 + this.cellSize;
-    const y2 = y1 + this.cellSize;
-
-    // Desenhar a parede como um retângulo de linhas
-    this.wallGraphics.strokeRect(x1, y1, this.cellSize, this.cellSize);
   }
 
   createMazeGrid() {
